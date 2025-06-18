@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  ExternalLinkIcon, 
+  ArrowTopRightOnSquareIcon, 
   DocumentDuplicateIcon,
   TagIcon,
   TruckIcon,
@@ -126,7 +126,7 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({ product, alternatives }
                 rel="noopener noreferrer"
                 className="btn-primary flex items-center"
               >
-                <ExternalLinkIcon className="h-4 w-4 mr-2" />
+                <ArrowTopRightOnSquareIcon className="h-4 w-4 mr-2" />
                 원본 보기
               </a>
             </div>

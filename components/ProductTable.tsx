@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   ArrowUpDownIcon, 
-  ExternalLinkIcon, 
+  ArrowTopRightOnSquareIcon, 
   DocumentDuplicateIcon,
   StarIcon 
 } from '@heroicons/react/24/outline';
@@ -218,7 +218,7 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, site, loading }) 
                     className="p-2 text-primary-600 hover:text-primary-700 dark:text-primary-400"
                     title="새 탭에서 열기"
                   >
-                    <ExternalLinkIcon className="h-4 w-4" />
+                    <ArrowTopRightOnSquareIcon className="h-4 w-4" />
                   </a>
                 </div>
               </td>
