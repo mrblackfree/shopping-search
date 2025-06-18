@@ -33,7 +33,7 @@ export interface SearchResponse {
   data?: {
     alibaba: SearchResult;
     dhgate: SearchResult;
-    china1688: SearchResult;
+    '1688': SearchResult;
   };
   error?: string;
 }

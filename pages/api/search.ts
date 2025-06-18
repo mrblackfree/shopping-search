@@ -59,7 +59,7 @@ export default async function handler(
         site: 'dhgate' as const,
         searchTime: 0
       },
-      china1688: china1688Result.status === 'fulfilled' ? china1688Result.value : {
+      '1688': china1688Result.status === 'fulfilled' ? china1688Result.value : {
         query: chineseKeyword,
         totalResults: 0,
         products: [],

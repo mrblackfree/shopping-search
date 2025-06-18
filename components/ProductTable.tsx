@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  ArrowUpDownIcon, 
+  ArrowsUpDownIcon, 
   ArrowTopRightOnSquareIcon, 
   DocumentDuplicateIcon,
   StarIcon 
@@ -107,7 +107,7 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, site, loading }) 
             >
               <div className="flex items-center">
                 가격 (한화)
-                <ArrowUpDownIcon className="h-4 w-4 ml-1" />
+                <ArrowsUpDownIcon className="h-4 w-4 ml-1" />
               </div>
             </th>
             <th 
@@ -116,7 +116,7 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, site, loading }) 
             >
               <div className="flex items-center">
                 판매자
-                <ArrowUpDownIcon className="h-4 w-4 ml-1" />
+                <ArrowsUpDownIcon className="h-4 w-4 ml-1" />
               </div>
             </th>
             <th className="table-cell text-left">추가 정보</th>

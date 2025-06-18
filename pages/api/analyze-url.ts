@@ -6,7 +6,7 @@ import { searchAlibaba } from '../../lib/scrapers/alibaba';
 import { searchDHgate } from '../../lib/scrapers/dhgate';
 import { searchChina1688 } from '../../lib/scrapers/china1688';
 import { summarizeProduct, compareProducts, optimizeSearchKeyword } from '../../lib/deepseek';
-import { AnalyzeResponse, AlternativeProduct } from '../../lib/types';
+import { AnalyzeResponse, AlternativeProduct, AnalyzedProduct } from '../../lib/types';
 
 function detectSite(url: string): 'alibaba' | '1688' | 'dhgate' | null {
   if (url.includes('alibaba.com')) return 'alibaba';
@@ -45,7 +45,7 @@ export default async function handler(
     }
 
     // 상품 정보 분석
-    let productData;
+    let productData: AnalyzedProduct;
     try {
       switch (site) {
         case 'alibaba':
