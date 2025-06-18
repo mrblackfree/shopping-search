@@ -39,15 +39,25 @@ npm install
 ```
 
 ### 2. 환경변수 설정
-`.env.local` 파일을 생성하고 다음 내용을 추가하세요:
+```bash
+# .env.example을 .env.local로 복사
+cp .env.example .env.local
+```
+
+`.env.local` 파일을 열고 실제 API 키로 변경하세요:
 
 ```env
-# DeepSeek API 키 (https://platform.deepseek.com)
-DEEPSEEK_API_KEY=your_deepseek_api_key_here
-
-# 선택사항: 프록시 설정 (크롤링 시 필요할 경우)
-# PROXY_URL=your_proxy_url_here
+# DeepSeek API Configuration
+DEEPSEEK_API_KEY=your_actual_deepseek_api_key_here
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+CUSTOM_KEY=production
 ```
+
+**DeepSeek API 키 발급 방법**:
+1. [DeepSeek Platform](https://platform.deepseek.com) 접속
+2. 회원가입 및 로그인
+3. API Keys 메뉴에서 새 키 생성
+4. 생성된 키를 `.env.local`에 입력
 
 ### 3. 개발 서버 실행
 ```bash
@@ -67,8 +77,13 @@ npm start
 ### Vercel 배포
 1. GitHub에 코드 푸시
 2. [Vercel](https://vercel.com)에서 프로젝트 연결
-3. 환경변수 설정 (`DEEPSEEK_API_KEY`)
+3. **환경변수 설정** (Settings → Environment Variables):
+   - `DEEPSEEK_API_KEY`: 실제 DeepSeek API 키
+   - `DEEPSEEK_BASE_URL`: `https://api.deepseek.com`
+   - `CUSTOM_KEY`: `production`
 4. 자동 배포 완료
+
+**중요**: 환경변수 설정 후 반드시 "Redeploy" 버튼을 클릭하여 재배포하세요!
 
 ## 📁 프로젝트 구조
 
