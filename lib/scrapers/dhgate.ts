@@ -22,164 +22,157 @@ export async function searchDHgate(keyword: string): Promise<SearchResult> {
       
       page = await createStealthPage(browser);
       
-      // DHgate 전용 설정
-      await page.addInitScript(() => {
-        Object.defineProperty(navigator, 'userAgent', {
-          get: () => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        });
+      // 간단한 데스크톱 설정
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      
+      // 기본 User-Agent 설정
+      await page.setExtraHTTPHeaders({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1'
       });
 
-      const searchUrl = `https://www.dhgate.com/wholesale/search.do?searchkey=${encodeURIComponent(keyword)}&catalog=`;
+      // 간단한 검색 URL
+      const searchUrl = `https://www.dhgate.com/wholesale/search.do?searchkey=${encodeURIComponent(keyword)}`;
+      
+      console.log('🌐 DHgate URL:', searchUrl);
       
       // 페이지 로드
+      console.log('📥 페이지 로딩 중...');
       await page.goto(searchUrl, { 
-        waitUntil: 'networkidle', 
-        timeout: 30000 
+        waitUntil: 'domcontentloaded', 
+        timeout: 60000 
       });
 
-      // 자연스러운 딜레이
-      await randomDelay(3000, 5000);
-
-      // 상품 리스트가 로드될 때까지 대기
-      const productSelectors = [
-        '.stpro',
-        '.search-prd',
-        '.goods-item',
-        '.product-item',
-        '.item-info'
-      ];
-
-      const foundSelector = await waitForAnySelector(page, productSelectors, 15000);
+      // 로딩 대기
+      await page.waitForTimeout(5000);
       
-      if (!foundSelector) {
-        // 스크롤하여 동적 콘텐츠 로드 시도
-        console.log('상품 리스트 로딩 중... 스크롤 시도');
-        await scrollToLoadContent(page);
-        await randomDelay(3000, 5000);
-      }
-
-      // 상품 정보 추출
+      // 페이지 정보 확인
+      const pageTitle = await page.title();
+      const pageUrl = page.url();
+      console.log('📄 페이지 제목:', pageTitle);
+      console.log('🌐 현재 URL:', pageUrl);
+      
+      // 스크린샷 저장
+      await page.screenshot({ path: `dhgate-debug-${Date.now()}.png`, fullPage: true });
+      
+      // 페이지 내용 확인
+      const pageContent = await page.evaluate(() => {
+        const bodyText = document.body.textContent || '';
+        return {
+          bodyLength: bodyText.length,
+          title: document.title,
+          hasProducts: bodyText.includes('$') || bodyText.includes('price') || bodyText.includes('USD'),
+          bodyPreview: bodyText.substring(0, 500)
+        };
+      });
+      
+      console.log('📄 페이지 내용 분석:', pageContent);
+      
+      // 단순한 상품 검색
+      console.log('🔍 상품 요소 검색 중...');
+      
+      // 가장 기본적인 상품 추출
       const products = await page.evaluate(() => {
-        const productElements = document.querySelectorAll('.stpro, .search-prd, .goods-item, .product-item, .item-info');
         const results: any[] = [];
-
-        console.log(`발견된 상품 요소 수: ${productElements.length}`);
-
-        productElements.forEach((element, index) => {
-          if (index >= 5) return; // 상위 5개만
-
+        
+        // 다양한 상품 셀렉터 시도
+        const selectors = [
+          '.stpro',
+          '.search-prd',
+          '.goods-item',
+          '.item',
+          '[class*="product"]',
+          '[class*="item"]'
+        ];
+        
+        let foundElements: NodeListOf<Element> | null = null;
+        let usedSelector = '';
+        
+        for (const selector of selectors) {
+          const elements = document.querySelectorAll(selector);
+          console.log(`셀렉터 "${selector}": ${elements.length}개 요소`);
+          if (elements.length > 0) {
+            foundElements = elements;
+            usedSelector = selector;
+            break;
+          }
+        }
+        
+        if (!foundElements || foundElements.length === 0) {
+          console.log('❌ 상품 요소를 찾을 수 없음');
+          
+          // 페이지에서 가격 정보가 있는 모든 요소 찾기
+          const priceElements = document.querySelectorAll('*');
+          let priceCount = 0;
+          Array.from(priceElements).forEach(el => {
+            const text = el.textContent || '';
+            if (text.includes('$') && text.match(/\$\s*\d+/)) {
+              priceCount++;
+            }
+          });
+          
+          console.log(`페이지에서 발견된 가격 요소: ${priceCount}개`);
+          
+          return [];
+        }
+        
+        console.log(`✅ "${usedSelector}"로 ${foundElements.length}개 요소 발견`);
+        
+        // 상위 5개 요소 처리
+        Array.from(foundElements).slice(0, 5).forEach((element, index) => {
           try {
-            // 제목 추출 (여러 셀렉터 시도)
-            const titleSelectors = [
-              '.item-title a',
-              '.product-title a',
-              'h2 a',
-              'h3 a',
-              'a[title]',
-              '.goods-title a'
-            ];
+            // 제목 찾기
+            const titleEl = element.querySelector('a[title], a, h1, h2, h3, .title, .name') as HTMLElement;
+            const title = titleEl ? (titleEl.getAttribute('title') || titleEl.textContent?.trim() || '') : '';
             
-            let title = '';
-            let productUrl = '';
-            for (const selector of titleSelectors) {
-              const titleEl = element.querySelector(selector) as HTMLAnchorElement;
-              if (titleEl) {
-                title = titleEl.textContent?.trim() || titleEl.getAttribute('title')?.trim() || '';
-                productUrl = titleEl.href || '';
-                if (title) break;
-              }
-            }
-
-            // 가격 추출
-            const priceSelectors = [
-              '.item-price',
-              '.price-current',
-              '.price-now',
-              '.cost',
-              '.price'
-            ];
-            
+            // 가격 찾기
+            const priceEl = element.querySelector('*') as HTMLElement;
             let priceText = '';
-            for (const selector of priceSelectors) {
-              const priceEl = element.querySelector(selector);
-              if (priceEl) {
-                priceText = priceEl.textContent?.trim() || '';
-                if (priceText) break;
-              }
+            if (priceEl) {
+              const allText = priceEl.textContent || '';
+              const priceMatch = allText.match(/\$\s*([\d.,]+)/);
+              priceText = priceMatch ? priceMatch[0] : '';
             }
-
-            // 이미지 추출
-            const imgSelectors = [
-              '.item-pic img',
-              '.product-image img',
-              '.goods-image img',
-              'img'
-            ];
             
-            let imageUrl = '';
-            for (const selector of imgSelectors) {
-              const imgEl = element.querySelector(selector) as HTMLImageElement;
-              if (imgEl) {
-                imageUrl = imgEl.src || imgEl.getAttribute('data-src') || '';
-                if (imageUrl && !imageUrl.includes('placeholder')) break;
-              }
-            }
-
-            // 판매자 정보
-            const sellerSelectors = ['.seller-name', '.store-name', '.shop-name'];
-            let sellerName = '';
-            for (const selector of sellerSelectors) {
-              const sellerEl = element.querySelector(selector);
-              if (sellerEl) {
-                sellerName = sellerEl.textContent?.trim() || '';
-                if (sellerName) break;
-              }
-            }
-
-            // 평점 정보
-            const ratingSelectors = ['.seller-rating', '.store-rating', '.rating'];
-            let ratingText = '';
-            for (const selector of ratingSelectors) {
-              const ratingEl = element.querySelector(selector);
-              if (ratingEl) {
-                ratingText = ratingEl.textContent?.trim() || '';
-                if (ratingText) break;
-              }
-            }
-
+            // URL 찾기
+            const linkEl = element.querySelector('a') as HTMLAnchorElement;
+            const productUrl = linkEl ? linkEl.href : '';
+            
             if (title && priceText) {
-              // 가격 파싱
-              const priceMatch = priceText.match(/\$?([\d.,]+)/);
+              const priceMatch = priceText.match(/\$\s*([\d.,]+)/);
               const price = priceMatch ? parseFloat(priceMatch[1].replace(',', '')) : 0;
-
-              // 평점 파싱
-              const ratingMatch = ratingText.match(/([\d.]+)/);
-              const rating = ratingMatch ? parseFloat(ratingMatch[1]) : undefined;
-
+              
               if (price > 0) {
                 results.push({
-                  id: `dhgate_${index}`,
-                  title,
+                  id: `dhgate_simple_${Date.now()}_${index}`,
+                  title: title.substring(0, 100),
                   price,
                   currency: 'USD',
-                  imageUrl: imageUrl ? (imageUrl.startsWith('http') ? imageUrl : `https:${imageUrl}`) : '',
-                  productUrl: productUrl ? (productUrl.startsWith('http') ? productUrl : `https://www.dhgate.com${productUrl}`) : '',
+                  imageUrl: '',
+                  productUrl: productUrl.startsWith('http') ? productUrl : `https://www.dhgate.com${productUrl}`,
                   seller: {
-                    name: sellerName,
-                    rating,
-                    trustLevel: rating && rating > 4.5 ? 'High' : rating && rating > 3.5 ? 'Medium' : 'Low'
+                    name: 'DHgate Seller',
+                    rating: undefined,
+                    trustLevel: 'Medium'
                   },
                   site: 'dhgate',
                   minOrder: 1,
                   shipping: 'Free Shipping'
                 });
+                
+                console.log(`✅ 상품 ${index + 1}: ${title.substring(0, 30)}... - ${priceText}`);
               }
             }
           } catch (error) {
-            console.error(`상품 ${index} 파싱 오류:`, error);
+            console.error(`상품 ${index} 처리 오류:`, error);
           }
         });
-
+        
+        console.log(`🎯 총 ${results.length}개 상품 추출`);
         return results;
       });
 
@@ -203,18 +196,12 @@ export async function searchDHgate(keyword: string): Promise<SearchResult> {
 
     } catch (error) {
       console.error('❌ DHgate 검색 오류:', error);
-      return {
-        query: keyword,
-        totalResults: 0,
-        products: [],
-        site: 'dhgate',
-        searchTime: Date.now() - startTime
-      };
+      throw error;
     } finally {
       if (page) await page.close();
       await browser.close();
     }
-  });
+  }, 3, 2000);
 }
 
 export async function analyzeDHgateProduct(url: string): Promise<any> {

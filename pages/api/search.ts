@@ -4,7 +4,7 @@ dotenv.config();
 import { NextApiRequest, NextApiResponse } from 'next';
 import { searchAlibabaSimple } from '../../lib/scrapers/alibaba-simple';
 import { searchDHgateSimple } from '../../lib/scrapers/dhgate-simple';
-import { search1688Simple } from '../../lib/scrapers/china1688-simple';
+import { searchChina1688Simple } from '../../lib/scrapers/china1688-simple';
 import { optimizeSearchKeyword } from '../../lib/deepseek';
 import { SearchResponse } from '../../lib/types';
 
@@ -56,7 +56,7 @@ export default async function handler(
     const [alibabaResult, dhgateResult, china1688Result] = await Promise.allSettled([
       searchAlibabaSimple(englishKeyword),
       searchDHgateSimple(englishKeyword),
-      search1688Simple(chineseKeyword)
+      searchChina1688Simple(chineseKeyword)
     ]);
 
     // 결과 처리
