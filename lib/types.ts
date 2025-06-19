@@ -13,7 +13,7 @@ export interface Product {
     transactions?: number;
     trustLevel?: string;
   };
-  site: 'alibaba' | '1688' | 'dhgate';
+  site: 'alibaba' | '1688' | 'dhgate' | 'aliexpress';
   minOrder?: number;
   shipping?: string;
 }
@@ -23,7 +23,7 @@ export interface SearchResult {
   query: string;
   totalResults: number;
   products: Product[];
-  site: 'alibaba' | '1688' | 'dhgate';
+  site: 'alibaba' | '1688' | 'dhgate' | 'aliexpress';
   searchTime: number;
 }
 
@@ -36,6 +36,7 @@ export interface SearchResponse {
     '1688': SearchResult;
   };
   error?: string;
+  vpnMode?: boolean; // VPN 크롤링 모드 여부
 }
 
 // URL 분석 결과 타입
@@ -51,7 +52,7 @@ export interface AnalyzedProduct {
     rating?: number;
     transactions?: number;
   };
-  site: 'alibaba' | '1688' | 'dhgate';
+  site: 'alibaba' | '1688' | 'dhgate' | 'aliexpress';
   imageUrls: string[];
   originalUrl: string;
   summary: string; // AI 생성 한글 요약

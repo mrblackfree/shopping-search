@@ -5,6 +5,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { searchAlibabaSimple } from '../../lib/scrapers/alibaba-simple';
 import { searchDHgateSimple } from '../../lib/scrapers/dhgate-simple';
 import { searchChina1688Simple } from '../../lib/scrapers/china1688-simple';
+import { crawlWithVPN } from '../../lib/scrapers/vpn-crawler';
 import { optimizeSearchKeyword } from '../../lib/deepseek';
 import { SearchResponse } from '../../lib/types';
 
@@ -20,7 +21,7 @@ export default async function handler(
   }
 
   try {
-    const { keyword } = req.body;
+    const { keyword, useVPN = false } = req.body;
 
     if (!keyword || typeof keyword !== 'string') {
       return res.status(400).json({
@@ -29,6 +30,50 @@ export default async function handler(
       });
     }
 
+    console.log(`🔍 검색 시작: ${keyword} (VPN: ${useVPN ? '활성화' : '비활성화'})`);
+
+    // VPN 크롤링 사용 여부 확인
+    if (useVPN) {
+      console.log('🌐 VPN 크롤링 모드 활성화');
+      
+      // VPN 크롤링 실행
+      const vpnResults = await crawlWithVPN(keyword);
+      
+      // VPN 결과를 기존 형식으로 변환
+      const data = {
+        alibaba: vpnResults.find(r => r.site === 'alibaba') || {
+          query: keyword,
+          totalResults: 0,
+          products: [],
+          site: 'alibaba' as const,
+          searchTime: 0
+        },
+        dhgate: vpnResults.find(r => r.site === 'dhgate') || {
+          query: keyword,
+          totalResults: 0,
+          products: [],
+          site: 'dhgate' as const,
+          searchTime: 0
+        },
+        '1688': vpnResults.find(r => r.site === '1688') || {
+          query: keyword,
+          totalResults: 0,
+          products: [],
+          site: '1688' as const,
+          searchTime: 0
+        }
+      };
+
+      return res.status(200).json({
+        success: true,
+        data,
+        vpnMode: true
+      });
+    }
+
+    // 기존 크롤링 방식 (VPN 미사용)
+    console.log('🔧 일반 크롤링 모드');
+    
     // 키워드 번역 (임시 비활성화)
     // const [englishKeyword, chineseKeyword] = await Promise.all([
     //   optimizeSearchKeyword(keyword, 'en'),

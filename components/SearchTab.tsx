@@ -8,6 +8,7 @@ const SearchTab: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResponse | null>(null);
   const [activeTab, setActiveTab] = useState<'alibaba' | 'dhgate' | '1688'>('alibaba');
+  const [useVPN, setUseVPN] = useState(false);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +27,10 @@ const SearchTab: React.FC = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ keyword: keyword.trim() }),
+        body: JSON.stringify({ 
+          keyword: keyword.trim(),
+          useVPN: useVPN 
+        }),
       });
 
       const data: SearchResponse = await response.json();
@@ -82,16 +86,66 @@ const SearchTab: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {/* VPN 크롤링 옵션 */}
+          <div className="flex items-center space-x-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <input
+              type="checkbox"
+              id="useVPN"
+              checked={useVPN}
+              onChange={(e) => setUseVPN(e.target.checked)}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              disabled={loading}
+            />
+            <label htmlFor="useVPN" className="flex-1">
+              <div className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                🌐 VPN 크롤링 모드
+              </div>
+              <div className="text-xs text-blue-700 dark:text-blue-300">
+                VPN 연결 시 중국 사이트 접근성 향상 및 실제 크롤링 성공률 증가
+              </div>
+            </label>
+            {useVPN && (
+              <div className="text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 px-2 py-1 rounded">
+                활성화
+              </div>
+            )}
+          </div>
           
           <button
             type="submit"
             disabled={loading || !keyword.trim()}
-            className="btn-primary w-full sm:w-auto"
+            className={`w-full sm:w-auto ${
+              useVPN 
+                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                : 'btn-primary'
+            } px-6 py-2 rounded-lg font-medium transition-colors`}
           >
-            {loading ? '검색 중...' : '🔍 검색하기'}
+            {loading ? (
+              <span className="flex items-center justify-center">
+                <div className="loading-spinner mr-2" />
+                {useVPN ? 'VPN 크롤링 중...' : '검색 중...'}
+              </span>
+            ) : (
+              <>
+                {useVPN ? '🌐 VPN 검색하기' : '🔍 검색하기'}
+              </>
+            )}
           </button>
         </form>
       </div>
+
+      {/* VPN 상태 표시 */}
+      {searchResults?.vpnMode && (
+        <div className="card p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+          <div className="flex items-center space-x-2">
+            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+            <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+              VPN 크롤링 모드로 검색되었습니다
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* 검색 결과 */}
       {searchResults && searchResults.data && (
@@ -115,6 +169,9 @@ const SearchTab: React.FC = () => {
                       {tab.name}
                     </span>
                     ({results.totalResults}개)
+                    {searchResults.vpnMode && (
+                      <span className="ml-1 text-xs text-blue-600 dark:text-blue-400">VPN</span>
+                    )}
                   </button>
                 );
               })}
@@ -142,8 +199,8 @@ const SearchTab: React.FC = () => {
               한국어로 상품명을 입력하면 Alibaba, DHgate, 1688에서 자동으로 검색됩니다.
             </p>
             <div className="mt-4 text-xs space-y-1">
-              <p>• Alibaba, DHgate: 영어로 번역하여 검색</p>
-              <p>• 1688: 중국어로 번역하여 검색</p>
+              <p>• <strong>일반 모드:</strong> 기본 크롤링 (테스트 데이터 포함)</p>
+              <p>• <strong>VPN 모드:</strong> 실제 크롤링 시도 (VPN 연결 시 성공률 향상)</p>
               <p>• 모든 가격은 한화로 환산하여 표시</p>
             </div>
           </div>
