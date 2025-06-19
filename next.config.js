@@ -7,6 +7,7 @@ const nextConfig = {
   },
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
+    DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
   },
 }
 

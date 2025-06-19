@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { NextApiRequest, NextApiResponse } from 'next';
 import { analyzeAlibabaProduct } from '../../lib/scrapers/alibaba';
 import { analyzeDHgateProduct } from '../../lib/scrapers/dhgate';

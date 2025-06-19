@@ -1,4 +1,8 @@
 import axios from 'axios';
+import dotenv from 'dotenv';
+
+// 환경변수 로드
+dotenv.config();
 
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
 
