@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { searchAlibaba } from '../../lib/scrapers/alibaba';
 import { searchDHgate } from '../../lib/scrapers/dhgate';
-import { searchChina1688 } from '../../lib/scrapers/china1688';
+import { search1688 } from '../../lib/scrapers/china1688';
 import { optimizeSearchKeyword } from '../../lib/deepseek';
 import { SearchResponse } from '../../lib/types';
 
@@ -40,7 +40,7 @@ export default async function handler(
     const [alibabaResult, dhgateResult, china1688Result] = await Promise.allSettled([
       searchAlibaba(englishKeyword),
       searchDHgate(englishKeyword),
-      searchChina1688(chineseKeyword)
+      search1688(chineseKeyword)
     ]);
 
     // 결과 처리

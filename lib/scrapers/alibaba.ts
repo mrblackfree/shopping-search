@@ -1,182 +1,379 @@
-import axios from 'axios';
-import * as cheerio from 'cheerio';
+import { 
+  createStealthBrowser, 
+  createStealthPage, 
+  randomDelay, 
+  waitForAnySelector, 
+  scrollToLoadContent,
+  retryWithBackoff,
+  getRandomUserAgent
+} from '../playwright-utils';
 import { Product, SearchResult } from '../types';
 import { convertToKRW } from '../exchange';
-
-const ALIBABA_SEARCH_URL = 'https://www.alibaba.com/trade/search';
-const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
 
 export async function searchAlibaba(keyword: string): Promise<SearchResult> {
   const startTime = Date.now();
   
-  try {
-    const response = await axios.get(ALIBABA_SEARCH_URL, {
-      params: {
-        fsb: 'y',
-        IndexArea: 'product_en',
-        CatId: '',
-        SearchText: keyword,
-        viewtype: 'G'
-      },
-      headers: {
-        'User-Agent': USER_AGENT,
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-      },
-      timeout: 10000
-    });
-
-    const $ = cheerio.load(response.data);
-    const products: Product[] = [];
-
-    // Alibaba 상품 카드 선택자 (실제 구조에 맞게 조정 필요)
-    $('.gallery-offer-item, .organic-offer-wrapper').each(async (index, element) => {
-      if (index >= 5) return false; // 상위 5개만
-
-      const $el = $(element);
+  return await retryWithBackoff(async () => {
+    const browser = await createStealthBrowser();
+    let page;
+    
+    try {
+      console.log('🔍 Alibaba 검색 시작:', keyword);
       
-      try {
-        // 상품 정보 추출
-        const titleElement = $el.find('.offer-title a, .title-link');
-        const title = titleElement.text().trim();
-        const productUrl = titleElement.attr('href') || '';
+      page = await createStealthPage(browser);
+      
+      // Alibaba 전용 설정
+      await page.addInitScript(() => {
+        Object.defineProperty(navigator, 'userAgent', {
+          get: () => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        });
         
-        const priceText = $el.find('.price-current, .price').text().trim();
-        const priceMatch = priceText.match(/[\d,]+\.?\d*/);
-        const price = priceMatch ? parseFloat(priceMatch[0].replace(/,/g, '')) : 0;
+        // 추가 봇 감지 우회
+        Object.defineProperty(navigator, 'webdriver', {
+          get: () => undefined,
+        });
         
-        const imageUrl = $el.find('.offer-img img, .product-img img').attr('src') || '';
-        
-        // 판매자 정보
-        const sellerName = $el.find('.supplier-name a, .company-name').text().trim();
-        const ratingText = $el.find('.rating-star, .supplier-rating').text().trim();
-        const ratingMatch = ratingText.match(/[\d.]+/);
-        const rating = ratingMatch ? parseFloat(ratingMatch[0]) : undefined;
-        
-        // 거래 수 정보
-        const transactionText = $el.find('.transaction-level, .trade-amount').text().trim();
-        const transactionMatch = transactionText.match(/[\d,]+/);
-        const transactions = transactionMatch ? parseInt(transactionMatch[0].replace(/,/g, '')) : undefined;
-        
-        // 최소 주문량
-        const minOrderText = $el.find('.moq, .min-order').text().trim();
-        const minOrderMatch = minOrderText.match(/[\d,]+/);
-        const minOrder = minOrderMatch ? parseInt(minOrderMatch[0].replace(/,/g, '')) : undefined;
+        Object.defineProperty(navigator, 'plugins', {
+          get: () => [1, 2, 3, 4, 5],
+        });
+      });
 
-        if (title && price > 0) {
-          const priceKRW = await convertToKRW(price, 'USD');
-          
-          products.push({
-            id: `alibaba_${index}`,
-            title,
-            price,
-            currency: 'USD',
-            priceKRW,
-            imageUrl: imageUrl.startsWith('//') ? `https:${imageUrl}` : imageUrl,
-            productUrl: productUrl.startsWith('//') ? `https:${productUrl}` : 
-                       productUrl.startsWith('/') ? `https://www.alibaba.com${productUrl}` : productUrl,
-            seller: {
-              name: sellerName,
-              rating,
-              transactions,
-              trustLevel: rating && rating > 4.0 ? 'High' : rating && rating > 3.0 ? 'Medium' : 'Low'
-            },
-            site: 'alibaba',
-            minOrder,
-            shipping: 'Contact Supplier'
-          });
-        }
-      } catch (error) {
-        console.error(`Alibaba 상품 ${index} 파싱 오류:`, error);
+      const searchUrl = `https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(keyword)}`;
+      
+      // 페이지 로드 (더 긴 타임아웃)
+      await page.goto(searchUrl, { 
+        waitUntil: 'networkidle', 
+        timeout: 45000 
+      });
+
+      // 자연스러운 딜레이
+      await randomDelay(4000, 7000);
+
+      // 캡차나 차단 페이지 확인
+      const isBlocked = await page.evaluate(() => {
+        const url = window.location.href;
+        const title = document.title;
+        return url.includes('punish') || 
+               url.includes('captcha') || 
+               title.includes('Access Denied') || 
+               title.includes('Captcha') ||
+               document.body.textContent?.includes('Please verify you are human');
+      });
+
+      if (isBlocked) {
+        console.log('⚠️ Alibaba 봇 감지 - 다른 방법 시도');
+        throw new Error('Alibaba bot detection triggered');
       }
-    });
 
-    return {
-      query: keyword,
-      totalResults: products.length,
-      products,
-      site: 'alibaba',
-      searchTime: Date.now() - startTime
-    };
+      // 상품 리스트가 로드될 때까지 대기
+      const productSelectors = [
+        '.organic-list-item',
+        '.gallery-offer-item',
+        '.list-no-v2-item',
+        '.product-item',
+        '[data-spm-anchor-id]'
+      ];
 
-  } catch (error) {
-    console.error('Alibaba 검색 오류:', error);
-    return {
-      query: keyword,
-      totalResults: 0,
-      products: [],
-      site: 'alibaba',
-      searchTime: Date.now() - startTime
-    };
-  }
+      const foundSelector = await waitForAnySelector(page, productSelectors, 20000);
+      
+      if (!foundSelector) {
+        // 스크롤하여 동적 콘텐츠 로드 시도
+        console.log('상품 리스트 로딩 중... 스크롤 시도');
+        await scrollToLoadContent(page);
+        await randomDelay(3000, 5000);
+      }
+
+      // 상품 정보 추출
+      const products = await page.evaluate(() => {
+        const productElements = document.querySelectorAll('.organic-list-item, .gallery-offer-item, .list-no-v2-item, .product-item, [data-spm-anchor-id]');
+        const results: any[] = [];
+
+        console.log(`발견된 상품 요소 수: ${productElements.length}`);
+
+        productElements.forEach((element, index) => {
+          if (index >= 5) return; // 상위 5개만
+
+          try {
+            // 제목 추출 (여러 셀렉터 시도)
+            const titleSelectors = [
+              '.elements-title-normal__content',
+              '.organic-offer-title',
+              '.title',
+              'h2',
+              'h3',
+              'a[title]'
+            ];
+            
+            let title = '';
+            let productUrl = '';
+            for (const selector of titleSelectors) {
+              const titleEl = element.querySelector(selector) as HTMLAnchorElement;
+              if (titleEl) {
+                title = titleEl.textContent?.trim() || titleEl.getAttribute('title')?.trim() || '';
+                productUrl = titleEl.href || '';
+                if (title) break;
+              }
+            }
+
+            // 가격 추출
+            const priceSelectors = [
+              '.price-current',
+              '.price-now',
+              '.price',
+              '.cost'
+            ];
+            
+            let priceText = '';
+            for (const selector of priceSelectors) {
+              const priceEl = element.querySelector(selector);
+              if (priceEl) {
+                priceText = priceEl.textContent?.trim() || '';
+                if (priceText) break;
+              }
+            }
+
+            // 이미지 추출
+            const imgSelectors = [
+              '.organic-offer-image img',
+              '.product-image img',
+              'img'
+            ];
+            
+            let imageUrl = '';
+            for (const selector of imgSelectors) {
+              const imgEl = element.querySelector(selector) as HTMLImageElement;
+              if (imgEl) {
+                imageUrl = imgEl.src || imgEl.getAttribute('data-src') || '';
+                if (imageUrl && !imageUrl.includes('placeholder')) break;
+              }
+            }
+
+            // 판매자 정보
+            const sellerSelectors = ['.supplier-name', '.seller-name', '.company-name'];
+            let sellerName = '';
+            for (const selector of sellerSelectors) {
+              const sellerEl = element.querySelector(selector);
+              if (sellerEl) {
+                sellerName = sellerEl.textContent?.trim() || '';
+                if (sellerName) break;
+              }
+            }
+
+            // MOQ (최소 주문량) 추출
+            const moqSelectors = ['.min-order', '.moq', '.minimum-order'];
+            let minOrderText = '';
+            for (const selector of moqSelectors) {
+              const moqEl = element.querySelector(selector);
+              if (moqEl) {
+                minOrderText = moqEl.textContent?.trim() || '';
+                if (minOrderText) break;
+              }
+            }
+
+            if (title && priceText) {
+              // 가격 파싱 ($1.50-$2.30 형태)
+              const priceMatch = priceText.match(/\$?([\d.,]+)/);
+              const price = priceMatch ? parseFloat(priceMatch[1].replace(',', '')) : 0;
+
+              // MOQ 파싱
+              const moqMatch = minOrderText.match(/(\d+)/);
+              const minOrder = moqMatch ? parseInt(moqMatch[1]) : 1;
+
+              if (price > 0) {
+                results.push({
+                  id: `alibaba_${index}`,
+                  title,
+                  price,
+                  currency: 'USD',
+                  imageUrl: imageUrl ? (imageUrl.startsWith('http') ? imageUrl : `https:${imageUrl}`) : '',
+                  productUrl: productUrl ? (productUrl.startsWith('http') ? productUrl : `https://www.alibaba.com${productUrl}`) : '',
+                  seller: {
+                    name: sellerName,
+                    trustLevel: 'Medium'
+                  },
+                  site: 'alibaba',
+                  minOrder,
+                  shipping: 'Contact Supplier'
+                });
+              }
+            }
+          } catch (error) {
+            console.error(`상품 ${index} 파싱 오류:`, error);
+          }
+        });
+
+        return results;
+      });
+
+      // KRW 변환
+      const productsWithKRW = await Promise.all(
+        products.map(async (product: any) => ({
+          ...product,
+          priceKRW: await convertToKRW(product.price, 'USD')
+        }))
+      );
+
+      console.log(`✅ Alibaba에서 ${productsWithKRW.length}개 상품 발견`);
+      
+      return {
+        query: keyword,
+        totalResults: productsWithKRW.length,
+        products: productsWithKRW,
+        site: 'alibaba',
+        searchTime: Date.now() - startTime
+      };
+
+    } catch (error) {
+      console.error('❌ Alibaba 검색 오류:', error);
+      return {
+        query: keyword,
+        totalResults: 0,
+        products: [],
+        site: 'alibaba',
+        searchTime: Date.now() - startTime
+      };
+    } finally {
+      if (page) await page.close();
+      await browser.close();
+    }
+  }, 2, 2000); // 재시도 2회, 2초 간격
 }
 
 export async function analyzeAlibabaProduct(url: string): Promise<any> {
-  try {
-    const response = await axios.get(url, {
-      headers: {
-        'User-Agent': USER_AGENT,
-      },
-      timeout: 10000
-    });
+  return await retryWithBackoff(async () => {
+    const browser = await createStealthBrowser();
+    let page;
+    
+    try {
+      console.log('🔍 Alibaba 상품 분석:', url);
+      
+      page = await createStealthPage(browser);
+      
+      await page.goto(url, { 
+        waitUntil: 'networkidle', 
+        timeout: 45000 
+      });
 
-    const $ = cheerio.load(response.data);
-    
-    // 상품 정보 추출
-    const title = $('.product-title h1, .product-name').text().trim();
-    const description = $('.product-description, .product-detail').text().trim();
-    
-    const priceText = $('.price-current, .price-range').text().trim();
-    const priceMatch = priceText.match(/[\d,]+\.?\d*/);
-    const price = priceMatch ? parseFloat(priceMatch[0].replace(/,/g, '')) : 0;
-    
-    const sellerName = $('.supplier-name, .company-name').text().trim();
-    const ratingText = $('.rating-star').text().trim();
-    const ratingMatch = ratingText.match(/[\d.]+/);
-    const rating = ratingMatch ? parseFloat(ratingMatch[0]) : undefined;
-    
-    // 이미지 URL들
-    const imageUrls: string[] = [];
-    $('.product-img img, .image-gallery img').each((_, el) => {
-      const src = $(el).attr('src');
-      if (src) {
-        imageUrls.push(src.startsWith('//') ? `https:${src}` : src);
+      await randomDelay(4000, 7000);
+
+      // 캡차 확인
+      const isBlocked = await page.evaluate(() => {
+        const url = window.location.href;
+        return url.includes('punish') || url.includes('captcha');
+      });
+
+      if (isBlocked) {
+        throw new Error('Alibaba product page blocked');
       }
-    });
-    
-    // 사양 정보
-    const specifications: { [key: string]: string } = {};
-    $('.product-spec tr, .specification-item').each((_, el) => {
-      const key = $(el).find('td:first-child, .spec-key').text().trim();
-      const value = $(el).find('td:last-child, .spec-value').text().trim();
-      if (key && value) {
-        specifications[key] = value;
-      }
-    });
 
-    const priceKRW = await convertToKRW(price, 'USD');
+      const productData = await page.evaluate(() => {
+        // 제목 추출
+        const titleSelectors = [
+          '.product-title h1',
+          '.product-name',
+          'h1',
+          '.title'
+        ];
+        
+        let title = '';
+        for (const selector of titleSelectors) {
+          const el = document.querySelector(selector);
+          if (el) {
+            title = el.textContent?.trim() || '';
+            if (title) break;
+          }
+        }
 
-    return {
-      title,
-      description,
-      price,
-      currency: 'USD',
-      priceKRW,
-      specifications,
-      seller: {
-        name: sellerName,
-        rating,
-      },
-      site: 'alibaba',
-      imageUrls,
-      originalUrl: url
-    };
+        // 가격 추출
+        const priceSelectors = [
+          '.price-current',
+          '.price-now',
+          '.price-range',
+          '.price'
+        ];
+        
+        let priceText = '';
+        for (const selector of priceSelectors) {
+          const el = document.querySelector(selector);
+          if (el) {
+            priceText = el.textContent?.trim() || '';
+            if (priceText) break;
+          }
+        }
 
-  } catch (error) {
-    console.error('Alibaba 상품 분석 오류:', error);
-    throw new Error('Alibaba 상품 정보를 가져올 수 없습니다.');
-  }
+        // 설명 추출
+        const descSelectors = [
+          '.product-description',
+          '.product-detail',
+          '.description'
+        ];
+        
+        let description = '';
+        for (const selector of descSelectors) {
+          const el = document.querySelector(selector);
+          if (el) {
+            description = el.textContent?.trim() || '';
+            if (description) break;
+          }
+        }
+
+        // 판매자 정보
+        const sellerSelectors = [
+          '.supplier-name',
+          '.company-name',
+          '.seller-name'
+        ];
+        
+        let sellerName = '';
+        for (const selector of sellerSelectors) {
+          const el = document.querySelector(selector);
+          if (el) {
+            sellerName = el.textContent?.trim() || '';
+            if (sellerName) break;
+          }
+        }
+
+        // 이미지 수집
+        const imageUrls: string[] = [];
+        const imgElements = document.querySelectorAll('.product-gallery img, .product-images img');
+        imgElements.forEach(img => {
+          const src = (img as HTMLImageElement).src || img.getAttribute('data-src');
+          if (src && !src.includes('placeholder')) {
+            imageUrls.push(src.startsWith('//') ? `https:${src}` : src);
+          }
+        });
+
+        const priceMatch = priceText.match(/\$?([\d.,]+)/);
+        const price = priceMatch ? parseFloat(priceMatch[1].replace(',', '')) : 0;
+
+        return {
+          title,
+          description,
+          price,
+          currency: 'USD',
+          seller: {
+            name: sellerName
+          },
+          site: 'alibaba',
+          imageUrls,
+          originalUrl: window.location.href
+        };
+      });
+
+      const finalProductData = {
+        ...productData,
+        priceKRW: productData.price > 0 ? await convertToKRW(productData.price, 'USD') : 0
+      };
+
+      console.log('✅ Alibaba 상품 분석 완료');
+      return finalProductData;
+
+    } catch (error) {
+      console.error('❌ Alibaba 상품 분석 오류:', error);
+      throw new Error('Alibaba 상품 정보를 가져올 수 없습니다.');
+    } finally {
+      if (page) await page.close();
+      await browser.close();
+    }
+  }, 2, 2000);
 } 
