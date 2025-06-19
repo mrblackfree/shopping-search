@@ -2,9 +2,9 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { NextApiRequest, NextApiResponse } from 'next';
-import { searchAlibaba } from '../../lib/scrapers/alibaba';
-import { searchDHgate } from '../../lib/scrapers/dhgate';
-import { search1688 } from '../../lib/scrapers/china1688';
+import { searchAlibabaSimple } from '../../lib/scrapers/alibaba-simple';
+import { searchDHgateSimple } from '../../lib/scrapers/dhgate-simple';
+import { search1688Simple } from '../../lib/scrapers/china1688-simple';
 import { optimizeSearchKeyword } from '../../lib/deepseek';
 import { SearchResponse } from '../../lib/types';
 
@@ -29,11 +29,24 @@ export default async function handler(
       });
     }
 
-    // 키워드 번역
-    const [englishKeyword, chineseKeyword] = await Promise.all([
-      optimizeSearchKeyword(keyword, 'en'),
-      optimizeSearchKeyword(keyword, 'zh')
-    ]);
+    // 키워드 번역 (임시 비활성화)
+    // const [englishKeyword, chineseKeyword] = await Promise.all([
+    //   optimizeSearchKeyword(keyword, 'en'),
+    //   optimizeSearchKeyword(keyword, 'zh')
+    // ]);
+    
+    // 임시로 직접 번역된 키워드 사용
+    const englishKeyword = keyword === '무선 이어폰' ? 'wireless earphones' : 
+                          keyword === '노트북' ? 'laptop' :
+                          keyword === '스마트폰 케이스' ? 'phone case' :
+                          keyword === 'LED 조명' ? 'LED light' :
+                          keyword; // 기본값은 원본 키워드
+                          
+    const chineseKeyword = keyword === '무선 이어폰' ? '无线耳机' :
+                          keyword === '노트북' ? '笔记本电脑' :
+                          keyword === '스마트폰 케이스' ? '手机壳' :
+                          keyword === 'LED 조명' ? 'LED灯' :
+                          keyword; // 기본값은 원본 키워드
 
     console.log(`검색 키워드: ${keyword}`);
     console.log(`영어 번역: ${englishKeyword}`);
@@ -41,9 +54,9 @@ export default async function handler(
 
     // 3개 사이트에서 동시 검색
     const [alibabaResult, dhgateResult, china1688Result] = await Promise.allSettled([
-      searchAlibaba(englishKeyword),
-      searchDHgate(englishKeyword),
-      search1688(chineseKeyword)
+      searchAlibabaSimple(englishKeyword),
+      searchDHgateSimple(englishKeyword),
+      search1688Simple(chineseKeyword)
     ]);
 
     // 결과 처리
