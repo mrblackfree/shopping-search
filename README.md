@@ -27,7 +27,7 @@
 - **Styling**: Tailwind CSS
 - **AI**: DeepSeek API (번역, 요약)
 - **환율**: exchangerate.host API
-- **크롤링**: Axios, Cheerio
+- **크롤링**: Playwright (봇 감지 우회, JavaScript 렌더링)
 - **아이콘**: Heroicons
 - **테마**: next-themes
 
@@ -36,6 +36,7 @@
 ### 1. 의존성 설치
 ```bash
 npm install
+npx playwright install  # Playwright 브라우저 설치
 ```
 
 ### 2. 환경변수 설정
@@ -97,10 +98,11 @@ Shopping/
 │   ├── ProductSummary.tsx # 상품 요약
 │   └── ThemeToggle.tsx # 다크모드 토글
 ├── lib/                # 유틸리티 라이브러리
-│   ├── scrapers/       # 사이트별 크롤러
+│   ├── scrapers/       # 사이트별 크롤러 (Playwright 기반)
 │   │   ├── alibaba.ts
 │   │   ├── dhgate.ts
 │   │   └── china1688.ts
+│   ├── playwright-utils.ts # Playwright 공통 유틸리티
 │   ├── deepseek.ts     # DeepSeek API
 │   ├── exchange.ts     # 환율 API
 │   └── types.ts        # TypeScript 타입
@@ -155,8 +157,29 @@ URL 분석 및 대안 추천
 3. **환율**: 실시간 환율이므로 실제 거래 시 차이가 있을 수 있습니다
 4. **상품 정보**: 크롤링된 정보는 실시간이 아닐 수 있습니다
 
+## 🎭 Playwright 크롤링 시스템
+
+### 주요 특징
+- **봇 감지 우회**: 실제 브라우저 환경 시뮬레이션
+- **JavaScript 렌더링**: 동적 콘텐츠 완전 지원
+- **스텔스 모드**: User-Agent 로테이션, 자연스러운 딜레이
+- **에러 복구**: 자동 재시도 로직 및 여러 셀렉터 시도
+- **사이트별 최적화**: 각 사이트의 특성에 맞는 크롤링 전략
+
+### 테스트
+```bash
+# 개별 사이트 테스트
+node test-playwright-crawling.js --dhgate
+node test-playwright-crawling.js --alibaba
+node test-playwright-crawling.js --1688
+
+# 전체 테스트
+node test-playwright-crawling.js
+```
+
 ## 🚀 향후 개선 계획
 
+- [ ] 프록시 로테이션 시스템
 - [ ] 상품 북마크 기능
 - [ ] 가격 알림 기능
 - [ ] 더 많은 사이트 지원
