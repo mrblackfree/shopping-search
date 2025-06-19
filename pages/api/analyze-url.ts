@@ -1,10 +1,10 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { analyzeAlibabaProduct } from '../../lib/scrapers/alibaba';
 import { analyzeDHgateProduct } from '../../lib/scrapers/dhgate';
-import { analyzeChina1688Product } from '../../lib/scrapers/china1688';
+import { analyze1688Product } from '../../lib/scrapers/china1688';
 import { searchAlibaba } from '../../lib/scrapers/alibaba';
 import { searchDHgate } from '../../lib/scrapers/dhgate';
-import { searchChina1688 } from '../../lib/scrapers/china1688';
+import { search1688 } from '../../lib/scrapers/china1688';
 import { summarizeProduct, compareProducts, optimizeSearchKeyword } from '../../lib/deepseek';
 import { AnalyzeResponse, AlternativeProduct, AnalyzedProduct } from '../../lib/types';
 
@@ -52,7 +52,7 @@ export default async function handler(
           productData = await analyzeAlibabaProduct(url);
           break;
         case '1688':
-          productData = await analyzeChina1688Product(url);
+          productData = await analyze1688Product(url);
           break;
         case 'dhgate':
           productData = await analyzeDHgateProduct(url);
@@ -105,7 +105,7 @@ export default async function handler(
       
       if (site !== '1688') {
         const chineseKeyword = await optimizeSearchKeyword(searchKeyword, 'zh');
-        searchPromises.push(searchChina1688(chineseKeyword));
+        searchPromises.push(search1688(chineseKeyword));
       }
 
       const searchResults = await Promise.all(searchPromises.map(p => 
